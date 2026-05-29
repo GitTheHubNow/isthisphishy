@@ -162,6 +162,7 @@
     .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 16px; }
     .stat-card-num { font-size: 32px; font-weight: 900; color: var(--cyan); line-height: 1; font-family: monospace; }
     .stat-card-label { font-size: 11px; color: var(--sub); margin-top: 4px; }
+    .stat-card--waiting { opacity: 0.65; border-style: dashed; }
     .recent-flag { background: var(--card); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 12px; }
     .recent-flag-right { flex: 1; overflow: hidden; }
     .recent-flag-label { font-size: 11px; color: var(--sub); }
@@ -376,6 +377,8 @@
     <div class="stats-grid">
       <div class="stat-card"><div class="stat-card-num" id="statTotal">—</div><div class="stat-card-label">Messages analysed</div></div>
       <div class="stat-card"><div class="stat-card-num" id="statScamPct" style="color:var(--high)">—</div><div class="stat-card-label">% flagged suspicious</div></div>
+      <div class="stat-card"><div class="stat-card-num" id="statSafeCount" style="color:var(--low)">—</div><div class="stat-card-label">Confirmed not scam</div></div>
+      <div class="stat-card" id="statAgreementCard"><div class="stat-card-num" id="statAgreement" style="color:var(--cyan)">—</div><div class="stat-card-label" id="statAgreementLabel">Agreement rate</div></div>
     </div>
     <div class="section-label" style="margin-bottom:10px">Top scam types detected</div>
     <div id="scamTypeList" style="margin-bottom:24px"></div>
@@ -788,6 +791,23 @@ async function loadStats(){
     const body=await r.json(); const d=body.data||body;
     document.getElementById('statTotal').textContent = (d.total_analyzed||d.total_analyses||0).toLocaleString();
     document.getElementById('statScamPct').textContent = (d.scam_percentage||0)+'%';
+    // Not-scam count (low risk verdicts)
+    document.getElementById('statSafeCount').textContent = (d.low_risk||0).toLocaleString();
+    // Agreement rate — only meaningful once users have rated results
+    const agreeCard  = document.getElementById('statAgreementCard');
+    const agreeEl    = document.getElementById('statAgreement');
+    const agreeLabel = document.getElementById('statAgreementLabel');
+    if (d.agreement_rate != null) {
+      agreeCard.classList.remove('stat-card--waiting');
+      agreeEl.textContent  = d.agreement_rate + '%';
+      agreeEl.style.color  = d.agreement_rate >= 80 ? 'var(--low)' : d.agreement_rate >= 60 ? 'var(--cyan)' : 'var(--high)';
+      agreeLabel.textContent = 'Agreement rate (' + (d.feedback_count||0) + ' votes)';
+    } else {
+      agreeCard.classList.add('stat-card--waiting');
+      agreeEl.textContent  = 'N/A';
+      agreeEl.style.color  = 'var(--sub)';
+      agreeLabel.innerHTML = 'Agreement rate<br><span style="font-size:10px;color:var(--sub)">Rate results to unlock</span>';
+    }
     const tl=document.getElementById('scamTypeList');
     tl.innerHTML = d.top_scam_types.length
       ? d.top_scam_types.map(t=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${esc(t.label)}</span><span style="color:var(--sub)">${t.count}</span></div><div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--cyan);border-radius:2px;width:${d.top_scam_types[0].count?Math.round(t.count/d.top_scam_types[0].count*100):0}%;transition:width .6s"></div></div></div>`).join('')
