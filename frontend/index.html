@@ -223,10 +223,6 @@
     }
   </style>
 </head>
-<script>
-  window.PHISHY_API_BASE =
-    "https://isthisphishy.onrender.com";
-</script>
 <body>
 
 <!-- STARTUP OVERLAY — shown while Railway backend wakes from sleep -->
@@ -443,7 +439,8 @@
 </div>
 
 <script>
-const API = '/api';
+const API = (window.PHISHY_API_BASE || window.location.origin)
+  .replace(/\/$/, '') + '/api';
 const HIST_KEY = 'phishy_v1';
 const MAX_HIST = 30;
 let currentMsg = '', lastResult = null;
