@@ -223,6 +223,10 @@
     }
   </style>
 </head>
+<script>
+  window.PHISHY_API_BASE =
+    "https://isthisphishy.onrender.com";
+</script>
 <body>
 
 <!-- STARTUP OVERLAY — shown while Railway backend wakes from sleep -->
@@ -439,10 +443,7 @@
 </div>
 
 <script>
-// API base: uses window.PHISHY_API_BASE if set (for Vercel → Railway split deploy)
-// Set this by adding <script>window.PHISHY_API_BASE = 'https://your-railway-app.up.railway.app'</script>
-// before this script tag. Defaults to same-origin for single-host deploys.
-const API = (window.PHISHY_API_BASE || window.location.origin).replace(/\/$/, '') + '/api';
+const API = '/api';
 const HIST_KEY = 'phishy_v1';
 const MAX_HIST = 30;
 let currentMsg = '', lastResult = null;
