@@ -28,7 +28,7 @@ _lock = Lock()
 _total_analyzed: int = 0
 _verdict_counts: dict[str, int] = defaultdict(int)
 _scam_type_counts: dict[str, int] = defaultdict(int)
-_recent_high: deque[RecentFlag] = deque(maxlen=20)
+_recent_high: deque[RecentFlag] = deque(maxlen=1000)
 
 # Session start time
 _started_at: float = time.time()
@@ -95,6 +95,6 @@ def get_stats() -> dict:
                 {"type": t, "label": t.replace("_", " ").title(), "count": c}
                 for t, c in top_scam_types
             ],
-            "recent_high": recent[:10],
+            "recent_high": recent[:1000],
             "uptime_seconds": round(time.time() - _started_at),
         }

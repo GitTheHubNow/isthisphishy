@@ -7,6 +7,7 @@ All responses follow consistent {success, data/error} envelope.
 import csv
 import io
 import logging
+import os
 import time
 from collections import defaultdict
 from threading import Lock
@@ -70,7 +71,7 @@ def _run_and_record(text: str) -> tuple:
     """Run pipeline + phone trust + DB record. Returns (result, phone_trust, analysis_id)."""
     result      = run_pipeline(text)
     phone_trust = classify_phones(text, result.features.brand_detected)
-    analysis_id = db.record_analysis(result) or 0
+    analysis_id = db.record_analysis(result, original_text=text) or 0
     mem_stats.record(result)
     return result, phone_trust, analysis_id
 
@@ -296,6 +297,38 @@ async def feedback(request: Request, body: FeedbackRequest):
     return FeedbackResponse(status="ok")
 
 
+# ── Recent high helper — prefers DB (persistent) over in-memory ──────────────
+def _get_recent_high_db(limit: int = 1000) -> list[dict]:
+    """Pull recent high-risk flags from Turso/SQLite with time formatting."""
+    import time
+    try:
+        rows = db.get_recent_high(limit=limit)
+        now  = time.time()
+        result = []
+        for r in rows:
+            # Parse created_at if available, else use day
+            try:
+                from datetime import datetime, timezone
+                dt = datetime.fromisoformat(r.get("created_at") or r.get("day") or "")
+                secs_ago = round((datetime.now(timezone.utc) - dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else datetime.now(timezone.utc) - dt).total_seconds())
+            except Exception:
+                secs_ago = 0
+            result.append({
+                "scam_type":   r.get("scam_type", ""),
+                "scam_label":  r.get("scam_label") or r.get("scam_type", "").replace("_", " ").title(),
+                "verdict":     r.get("verdict", "high"),
+                "risk_score":  int(r.get("risk_score") or 0),
+                "preview":     r.get("message_preview", ""),
+                "brand":       r.get("brand_impersonated"),
+                "seconds_ago": max(secs_ago, 0),
+            })
+        return result
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("_get_recent_high_db failed: %s", e)
+        return []
+
+
 # ── GET /stats ─────────────────────────────────────────────────────────────────
 @router.get("/stats")
 async def get_stats():
@@ -317,25 +350,122 @@ async def get_stats():
                 {"type": t["type"], "label": t["type"].replace("_", " ").title(), "count": t["count"]}
                 for t in summary["top_scam_types"]
             ],
-            "recent_high":    live["recent_high"],
+            "recent_high":    _get_recent_high_db() or live["recent_high"],
             "uptime_seconds": live["uptime_seconds"],
             "signals":        summary.get("signals", {}),
         },
     }
 
 
-# ── GET /report ────────────────────────────────────────────────────────────────
+# ── GET /flags — paginated feed of all analyses ──────────────────────────────
+@router.get("/flags")
+async def get_flags(
+    page:       int = 1,
+    limit:      int = 100,
+    verdict:    str = None,
+    scam_type:  str = None,
+    brand:      str = None,
+):
+    """
+    Paginated feed of analyses. Default 100 per page, max 500.
+
+    Query params:
+      page      — page number (default 1)
+      limit     — rows per page (default 100, max 500)
+      verdict   — filter: high | medium | low
+      scam_type — filter: phishing | investment | job | blackmail | ...
+      brand     — filter: commbank | nab | auspost | ...
+
+    Examples:
+      GET /api/flags                          → page 1, 100 rows
+      GET /api/flags?page=2                   → page 2
+      GET /api/flags?verdict=high&limit=50    → high risk only, 50/page
+      GET /api/flags?brand=commbank           → CommBank scams only
+    """
+    data = db.get_flags(page=page, limit=limit, verdict=verdict, scam_type=scam_type, brand=brand)
+    return {"success": True, "data": data}
+
+
+# ── GET /db-status ─────────────────────────────────────────────────────────────
+@router.get("/db-status")
+async def db_status():
+    """Shows which database backend is active. Useful after deploy."""
+    import os
+    turso_url   = os.getenv("TURSO_URL", "").strip()
+    turso_token = os.getenv("TURSO_TOKEN", "").strip()
+    using_turso = bool(turso_url and turso_token)
+    try:
+        stats = db.get_stats()
+        ok    = True
+    except Exception as e:
+        stats = {}
+        ok    = False
+    return {
+        "success": True,
+        "data": {
+            "backend":      "turso" if using_turso else "sqlite_local",
+            "persistent":   using_turso,
+            "db_reachable": ok,
+            "total_rows":   stats.get("total_analyses", 0),
+            "turso_url":    turso_url if using_turso else None,
+        }
+    }
+
+
+# ── GET /report — summary (public or admin-gated) ─────────────────────────────
 @router.get("/report")
 async def get_report(request: Request, days: int = 30):
-    # Optional admin token protection
     if cfg.ADMIN_TOKEN:
         token = request.headers.get("X-Admin-Token", "")
         if token != cfg.ADMIN_TOKEN:
-            return JSONResponse(
-                status_code=403,
-                content={"success": False, "error": "forbidden"},
-            )
+            return JSONResponse(status_code=403, content={"success": False, "error": "forbidden"})
     return {"success": True, "data": db.get_summary(days=min(days, 365))}
+
+
+# ── GET /analyst — full case-level report for banks / ScamWatch ───────────────
+@router.get("/analyst")
+async def get_analyst_report(
+    request:    Request,
+    days:       int = 30,
+    scam_type:  str = None,
+    brand:      str = None,
+    verdict:    str = None,
+    limit:      int = 500,
+):
+    """
+    Full analyst-ready report including individual case records.
+    Always requires X-Admin-Token header.
+
+    Query params:
+      days      — lookback window (default 30, max 365)
+      scam_type — filter by scam type e.g. phishing
+      brand     — filter by brand e.g. commbank
+      verdict   — filter by verdict: high | medium | low
+      limit     — max cases returned (default 500, max 2000)
+
+    Example:
+      GET /api/analyst?days=7&brand=commbank&verdict=high
+      Headers: X-Admin-Token: your-token
+    """
+    # Always require admin token for analyst endpoint
+    admin_token = cfg.ADMIN_TOKEN or os.getenv("ADMIN_TOKEN", "")
+    if not admin_token:
+        return JSONResponse(
+            status_code=503,
+            content={"success": False, "error": "ADMIN_TOKEN not configured on server"},
+        )
+    token = request.headers.get("X-Admin-Token", "")
+    if token != admin_token:
+        return JSONResponse(status_code=403, content={"success": False, "error": "forbidden"})
+
+    data = db.get_analyst_report(
+        days=min(days, 365),
+        scam_type=scam_type,
+        brand=brand,
+        verdict=verdict,
+        limit=min(limit, 2000),
+    )
+    return {"success": True, "data": data}
 
 
 # ── GET /health ────────────────────────────────────────────────────────────────

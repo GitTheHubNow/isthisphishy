@@ -97,6 +97,17 @@ class Config:
         os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")),
     )
 
+    # ── Turso persistent database ─────────────────────────────────────────────
+    # Set both to enable Turso (data persists across server restarts).
+    # Leave unset to fall back to local SQLite (data lost on restart).
+    # Get these from https://turso.tech → your database → Generate Token
+    TURSO_URL:   str | None = os.getenv("TURSO_URL")   or None
+    TURSO_TOKEN: str | None = os.getenv("TURSO_TOKEN") or None
+
+    # Set to "false" to store only message previews (first 8 words), not full text.
+    # Set to "true" (default) to store full message text for analyst reports.
+    STORE_MESSAGE_TEXT: bool = os.getenv("STORE_MESSAGE_TEXT", "true").lower() not in ("false", "0", "no")
+
     # ── Admin ─────────────────────────────────────────────────────────────────
     ADMIN_TOKEN: str | None = os.getenv("ADMIN_TOKEN") or None
 

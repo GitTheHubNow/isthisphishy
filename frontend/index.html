@@ -168,6 +168,11 @@
     .recent-flag-label { font-size: 11px; color: var(--sub); }
     .recent-flag-preview { font-size: 13px; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
     .recent-flag-time { font-size: 11px; color: var(--muted); flex-shrink: 0; }
+    .flags-pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 8px; }
+    .flags-pagination button { background: var(--card); border: 1px solid var(--border); color: var(--text); border-radius: var(--r); padding: 6px 14px; font-size: 12px; cursor: pointer; transition: background .15s; }
+    .flags-pagination button:hover:not(:disabled) { background: var(--border); }
+    .flags-pagination button:disabled { opacity: 0.35; cursor: default; }
+    .flags-page-info { font-size: 12px; color: var(--sub); text-align: center; flex: 1; }
 
     /* ABOUT */
     .about-section { margin-bottom: 24px; }
@@ -384,6 +389,11 @@
     <div id="scamTypeList" style="margin-bottom:24px"></div>
     <div class="section-label" style="margin-bottom:10px">Recent high-risk flags</div>
     <div id="recentHighList"></div>
+    <div class="flags-pagination" id="flagsPagination" style="display:none">
+      <button id="flagsPrev" onclick="flagsChangePage(-1)">← Prev</button>
+      <div class="flags-page-info" id="flagsPageInfo"></div>
+      <button id="flagsNext" onclick="flagsChangePage(1)">Next →</button>
+    </div>
   </div>
 </div>
 
@@ -812,12 +822,58 @@ async function loadStats(){
     tl.innerHTML = d.top_scam_types.length
       ? d.top_scam_types.map(t=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>${esc(t.label)}</span><span style="color:var(--sub)">${t.count}</span></div><div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden"><div style="height:100%;background:var(--cyan);border-radius:2px;width:${d.top_scam_types[0].count?Math.round(t.count/d.top_scam_types[0].count*100):0}%;transition:width .6s"></div></div></div>`).join('')
       : '<div style="color:var(--sub);font-size:13px">No data yet — analyse some messages first.</div>';
-    const rl=document.getElementById('recentHighList');
-    rl.innerHTML = d.recent_high.length
-      ? d.recent_high.map(f=>`<div class="recent-flag"><div style="font-size:20px">🚨</div><div class="recent-flag-right"><div class="recent-flag-label">${esc(f.scam_label)}</div><div class="recent-flag-preview">"${esc(f.preview)}"</div></div><div class="recent-flag-time">${f.seconds_ago<60?'just now':Math.round(f.seconds_ago/60)+'m ago'}</div></div>`).join('')
-      : '<div style="color:var(--sub);font-size:13px">No high-risk messages detected yet.</div>';
+    // Load paginated flags separately
+    loadFlags();
   } catch {}
 }
+
+// ── Paginated flags ────────────────────────────────────────────────────────
+let _flagsPage = 1;
+const _flagsLimit = 20;
+
+async function loadFlags(page) {
+  if (page !== undefined) _flagsPage = page;
+  try {
+    const r = await fetch(`${API}/flags?page=${_flagsPage}&limit=${_flagsLimit}&verdict=high`);
+    if (!r.ok) return;
+    const body = await r.json();
+    const d    = body.data || {};
+    const items = d.items || [];
+    const total = d.total || 0;
+    const pages = d.pages || 1;
+
+    const rl = document.getElementById('recentHighList');
+    rl.innerHTML = items.length
+      ? items.map(f => `<div class="recent-flag">
+          <div style="font-size:20px">🚨</div>
+          <div class="recent-flag-right">
+            <div class="recent-flag-label">${esc(f.scam_label)}${f.brand ? ` · <span style="color:var(--cyan)">${esc(f.brand)}</span>` : ''}</div>
+            <div class="recent-flag-preview">"${esc(f.preview)}"</div>
+          </div>
+          <div class="recent-flag-time">${f.seconds_ago < 60 ? 'just now' : f.seconds_ago < 3600 ? Math.round(f.seconds_ago/60)+'m ago' : Math.round(f.seconds_ago/3600)+'h ago'}</div>
+        </div>`).join('')
+      : '<div style="color:var(--sub);font-size:13px">No high-risk messages detected yet.</div>';
+
+    const pg = document.getElementById('flagsPagination');
+    const pi = document.getElementById('flagsPageInfo');
+    const pb = document.getElementById('flagsPrev');
+    const nb = document.getElementById('flagsNext');
+
+    if (total > _flagsLimit) {
+      pg.style.display = 'flex';
+      pi.textContent   = `Page ${_flagsPage} of ${pages} · ${total.toLocaleString()} total`;
+      pb.disabled      = _flagsPage <= 1;
+      nb.disabled      = _flagsPage >= pages;
+    } else {
+      pg.style.display = 'none';
+    }
+  } catch(e) {}
+}
+
+function flagsChangePage(dir) {
+  loadFlags(_flagsPage + dir);
+}
+
 
 // ── Util ───────────────────────────────────────────────────────────────
 function setLoading(on){
