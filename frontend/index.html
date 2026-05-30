@@ -834,7 +834,7 @@ const _flagsLimit = 20;
 async function loadFlags(page) {
   if (page !== undefined) _flagsPage = page;
   try {
-    const r = await fetch(`${API}/flags?page=${_flagsPage}&limit=${_flagsLimit}&verdict=high`);
+    const r = await fetch(`${API}/flags?page=${_flagsPage}&limit=${_flagsLimit}`);
     if (!r.ok) return;
     const body = await r.json();
     const d    = body.data || {};
@@ -847,7 +847,7 @@ async function loadFlags(page) {
       ? items.map(f => `<div class="recent-flag">
           <div style="font-size:20px">🚨</div>
           <div class="recent-flag-right">
-            <div class="recent-flag-label">${esc(f.scam_label)}${f.brand ? ` · <span style="color:var(--cyan)">${esc(f.brand)}</span>` : ''}</div>
+            <div class="recent-flag-label">${esc(f.scam_label)}${f.brand ? ` · <span style="color:var(--cyan)">${esc(f.brand)}</span>` : ''} <span style="font-size:10px;padding:1px 5px;border-radius:3px;background:${f.verdict==='high'?'color-mix(in srgb,var(--high) 20%,transparent)':f.verdict==='medium'?'color-mix(in srgb,var(--warn,#f59e0b) 20%,transparent)':'color-mix(in srgb,var(--low) 20%,transparent)'};color:${f.verdict==='high'?'var(--high)':f.verdict==='medium'?'var(--warn,#f59e0b)':'var(--low)'}">${f.verdict.toUpperCase()}</span></div>
             <div class="recent-flag-preview">"${esc(f.preview)}"</div>
           </div>
           <div class="recent-flag-time">${f.seconds_ago < 60 ? 'just now' : f.seconds_ago < 3600 ? Math.round(f.seconds_ago/60)+'m ago' : Math.round(f.seconds_ago/3600)+'h ago'}</div>
