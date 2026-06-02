@@ -102,8 +102,13 @@ def aggregate(
     #    cap at 20 to prevent residual noise inflating benign messages.
     #    Bypassed when raw_det >= 50 because that many pattern hits IS a signal.
     has_any_signal = any(check(features) for check in _STRONG_SIGNAL_CHECKS)
+    # Pattern hits are also a meaningful signal — if pattern engine fired,
+    # the FP gate should not suppress the score. This prevents low-signal
+    # scams (family impersonation, wrong-number openers, multilingual delivery)
+    # from being silently capped at 20.
+    has_pattern_signal = len(pattern_hits) >= 1
     fp_gate_applied = False
-    if not has_any_signal and raw_det < 50 and final > 20:
+    if not has_any_signal and not has_pattern_signal and raw_det < 50 and final > 20:
         final = 20
         fp_gate_applied = True
 

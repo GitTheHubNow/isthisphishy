@@ -244,6 +244,53 @@ _RAW_PATTERNS: list[tuple[str, str, str, int, str]] = [
     ("romance_investment_pivot",
      r'(?:i\s+can\s+teach\s+you|let\s+me\s+show\s+you|i\s+know\s+a\s+way).{0,40}(?:invest|crypto|earn|profit|trading)',
      "Pivots from friendly contact to investment pitch — pig butchering scam", 25, "romance"),
+    # ── ROMANCE / WRONG NUMBER OPENER ────────────────────────────────────────
+    ("romance_wrong_number_opener",
+     r'(?:hi|hey|hello)[,\s]+(?:are\s+you\s+\w+\?|is\s+this\s+\w+\?|do\s+i\s+know\s+you|(?:we|i)\s+(?:met|spoke|talked))',
+     "Unsolicited wrong-number opener — common romance/pig-butchering scam start", 18, "romance"),
+
+    # ── FAMILY IMPERSONATION ──────────────────────────────────────────────────
+    ("family_new_number",
+     r'(?:hi|hey)[,\s]+(?:mum|mom|dad|sis|bro|nan|gran|grandma|grandpa|mate)[,\s].{0,50}(?:new\s+(?:number|phone)|lost\s+(?:my\s+)?phone|changed\s+(?:my\s+)?number)',
+     "Claims to be family member with a new number — family impersonation scam", 28, "phishing"),
+
+    ("family_urgent_help",
+     r'(?:hi|hey)[,\s]+(?:mum|mom|dad|sis|bro|nan|gran|grandma|grandpa)[,\s].{0,60}(?:urgent|help|need\s+you|emergency|borrow|transfer|money)',
+     "Impersonates family member asking for urgent help — common SMS scam", 25, "phishing"),
+
+    # ── NEGATION / OBFUSCATION ────────────────────────────────────────────────
+    ("negation_scam_denial",
+     r'this\s+is\s+not\s+a\s+scam|not\s+(?:a\s+)?(?:spam|fraud|phishing|scam)',
+     "Explicitly denies being a scam — classic social engineering technique", 20, "phishing"),
+
+    ("double_negative_urgency",
+     r'(?:attention|action|response|contact).{0,40}may\s+not\s+be\s+unnecessary|immediate.{0,20}attention.{0,20}may\s+not\s+be\s+un',
+     "Double-negative urgency language — obfuscation tactic to evade spam filters", 18, "phishing"),
+
+    # ── MULTILINGUAL DELIVERY SCAMS ───────────────────────────────────────────
+    ("multilingual_delivery",
+     r'(?:hola|bonjour|ciao|hallo|ol\u00e1)[!,\s].{0,60}(?:package|parcel|delivery|shipment|delayed|pending|review)',
+     "Non-English opener with delivery claim — multilingual smishing attempt", 20, "delivery"),
+
+    # ── JOB SCAM (no URL needed) ──────────────────────────────────────────────
+    ("job_income_advertised",
+     r'(?:earn|make)\s+\$\s*\d{3,}\s*(?:per\s+day|/day|a\s+day|per\s+week|/week)|(?:remote\s+work|work\s+from\s+home)\s+opportunity',
+     "Advertises high income from remote work — job/income scam", 22, "job"),
+
+    # ── FAKE INVOICE / OVERDUE NOTICE ─────────────────────────────────────────
+    ("unpaid_invoice_due_today",
+     r'unpaid\s+invoice.{0,30}(?:due|today|reference)|(?:final\s+notice).{0,20}unpaid\s+invoice',
+     "Claims an invoice is due today — fake invoice scam", 20, "phishing"),
+
+    # ── BANK / SECURITY ALERT IMPERSONATION ───────────────────────────────────
+    ("bank_security_alert_generic",
+     r'bank(?:\s+security|\s+fraud\s+team|\s+alert)?[:\s].{0,60}(?:suspicious|unusual|unauthori[sz]ed|activity|detected|contact\s+support)',
+     "Generic bank security alert — financial institution impersonation", 22, "phishing"),
+
+    ("new_device_login_detected",
+     r'new\s+device\s+(?:login|sign.?in|access|detected)|(?:unrecogni[sz]ed|unknown)\s+(?:device|login).{0,30}(?:detected|alert)',
+     "New device login detected message — bank phishing pattern", 20, "phishing"),
+
 ]
 
 

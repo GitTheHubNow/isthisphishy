@@ -354,6 +354,37 @@ def evaluate_rules(features: Features) -> list[RuleHit]:
             score=22,
         ))
 
+
+    # ── Family impersonation (Hi Mum, new number) ────────────────────────────
+    # The pattern engine catches this, but rules add extra weight when
+    # urgency or payment language is also present.
+    _FAMILY_IMPERSONATION_RE = re.compile(
+        r'(?:hi|hey)[,\s]+(?:mum|mom|dad|sis|bro|nan|gran|grandma|grandpa)[,\s]',
+        re.IGNORECASE,
+    )
+    if _FAMILY_IMPERSONATION_RE.search(features.text_lower):
+        if features.urgency_keyword_count > 0 or features.has_payment_request:
+            hits.append(RuleHit(
+                type="family_impersonation_urgent",
+                detail="Impersonates family member with urgency/payment request — hi-mum scam",
+                score=20,
+            ))
+
+    # ── Negation obfuscation ─────────────────────────────────────────────────
+    # Messages that explicitly say "not a scam" or use double-negatives to
+    # disguise urgency are strongly suspicious.
+    _NEGATION_RE = re.compile(
+        r'this\s+is\s+not\s+a\s+scam|not\s+(?:a\s+)?(?:spam|fraud|scam)|'
+        r'(?:attention|action).{0,30}may\s+not\s+be\s+unnecessary',
+        re.IGNORECASE,
+    )
+    if _NEGATION_RE.search(features.text_lower):
+        hits.append(RuleHit(
+            type="negation_obfuscation",
+            detail="Explicitly denies being a scam or uses double-negative urgency — obfuscation tactic",
+            score=18,
+        ))
+
     # ── Known contact trust signal ────────────────────────────────────────────
     # Trust reduction is capped at -10 (was -20) and is never applied when
     # the score is already high (>=50 raw pts), preventing trust from masking

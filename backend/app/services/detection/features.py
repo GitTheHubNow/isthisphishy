@@ -12,6 +12,27 @@ import re
 from dataclasses import dataclass, field
 
 
+
+# ── Homoglyph / Unicode normalisation ────────────────────────────────────────
+# Maps common look-alike Unicode characters to their ASCII equivalents so that
+# brand detection catches "PaypaΙ" (Greek iota), "amaz0n", "m!crosoft" etc.
+_HOMOGLYPH_MAP: dict[str, str] = {
+    'Ι': 'I', 'Ӏ': 'I', 'І': 'I',  # Cyrillic/Greek uppercase I
+    'l': 'l',                                   # already ASCII l, covered
+    '0': '0',                                   # digit zero  (already ASCII)
+    'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a',
+    'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e',
+    'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i',
+    'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o',
+    'A': 'A',  # fullwidth A
+    '1': '1',  # digit 1 (already ASCII, no-op but explicit)
+}
+
+
+def _normalize_homoglyphs(text: str) -> str:
+    """Replace common look-alike Unicode characters with ASCII equivalents."""
+    return ''.join(_HOMOGLYPH_MAP.get(c, c) for c in text)
+
 # ── Compiled regexes ──────────────────────────────────────────────────────────
 
 _URL_RE = re.compile(
@@ -53,7 +74,7 @@ _SUSPICIOUS_TLDS = {
 _KNOWN_BRANDS: list[str] = [
     'commbank', 'commonwealth bank', 'nab', 'westpac', 'anz', 'macquarie',
     'auspost', 'australia post', 'ato', 'centrelink', 'mygov',
-    'paypal', 'apple', 'microsoft', 'amazon', 'netflix',
+    'paypal', 'paypaι', 'pay pal', 'apple', 'microsoft', 'amazon', 'netflix',
     'telstra', 'optus', 'vodafone', 'ebay', 'google',
 ]
 
@@ -70,6 +91,8 @@ _BRAND_DOMAINS: dict[str, str] = {
     'centrelink':        'servicesaustralia.gov.au',
     'mygov':             'my.gov.au',
     'paypal':            'paypal.com',
+    'paypaι':            'paypal.com',
+    'pay pal':           'paypal.com',
     'apple':             'apple.com',
     'microsoft':         'microsoft.com',
     'amazon':            'amazon.com',
@@ -255,9 +278,12 @@ def extract_features(text: str) -> Features:
     letters = [c for c in text if c.isalpha()]
     caps_ratio = sum(1 for c in letters if c.isupper()) / len(letters) if letters else 0.0
 
-    # Brand detection (longest match wins)
+    # Brand detection (longest match wins).
+    # Also check homoglyph-normalised text to catch "PaypaΙ", "amaz0n", etc.
+    _lower_norm = _normalize_homoglyphs(lower)
     brand_detected = next(
-        (b for b in sorted(_KNOWN_BRANDS, key=len, reverse=True) if b in lower),
+        (b for b in sorted(_KNOWN_BRANDS, key=len, reverse=True)
+         if b in lower or b in _lower_norm),
         None,
     )
 
