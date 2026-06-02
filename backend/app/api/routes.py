@@ -243,7 +243,7 @@ def _build_csv(results: list[dict]) -> str:
 # ── POST /analyze/file (JSON) ─────────────────────────────────────────────────
 @router.post("/analyze/file")
 async def analyze_file(request: Request, file: UploadFile = File(...)):
-    if not _check_rate(_get_ip(request)):
+    if not _check_rate(_get_ip(request), 10):
         return _rate_exceeded()
     lines = await _validate_and_read(file, request)
     results, skipped_long, skipped_limit = _process_lines(lines)
