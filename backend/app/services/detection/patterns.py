@@ -247,7 +247,7 @@ _RAW_PATTERNS: list[tuple[str, str, str, int, str]] = [
     # ── ROMANCE / WRONG NUMBER OPENER ────────────────────────────────────────
     ("romance_wrong_number_opener",
      r'(?:hi|hey|hello)[,\s]+(?:are\s+you\s+\w+\?|is\s+this\s+\w+\?|do\s+i\s+know\s+you|(?:we|i)\s+(?:met|spoke|talked))',
-     "Unsolicited wrong-number opener — common romance/pig-butchering scam start", 18, "romance"),
+     "Unsolicited wrong-number opener — common romance/pig-butchering scam start", 32, "romance"),
 
     # ── FAMILY IMPERSONATION ──────────────────────────────────────────────────
     ("family_new_number",
@@ -270,7 +270,7 @@ _RAW_PATTERNS: list[tuple[str, str, str, int, str]] = [
     # ── MULTILINGUAL DELIVERY SCAMS ───────────────────────────────────────────
     ("multilingual_delivery",
      r'(?:hola|bonjour|ciao|hallo|ol\u00e1)[!,\s].{0,60}(?:package|parcel|delivery|shipment|delayed|pending|review)',
-     "Non-English opener with delivery claim — multilingual smishing attempt", 20, "delivery"),
+     "Non-English opener with delivery claim — multilingual smishing attempt", 32, "delivery"),
 
     # ── JOB SCAM (no URL needed) ──────────────────────────────────────────────
     ("job_income_advertised",
@@ -290,6 +290,19 @@ _RAW_PATTERNS: list[tuple[str, str, str, int, str]] = [
     ("new_device_login_detected",
      r'new\s+device\s+(?:login|sign.?in|access|detected)|(?:unrecogni[sz]ed|unknown)\s+(?:device|login).{0,30}(?:detected|alert)',
      "New device login detected message — bank phishing pattern", 20, "phishing"),
+
+    # ── GARBLED / OBFUSCATED URGENCY ─────────────────────────────────────────
+    # Scammers use repeated ??? !!! and deliberately vague language like
+    # "maybe ok" or "acct" to slip past keyword filters while still conveying
+    # urgency to the recipient.
+    ("garbled_urgency_symbols",
+     r'(?:[!]{3}|[?]{3}).{0,30}(?:urgent|acct|account|verify|confirm|ref)|'
+     r'(?:urgent|acct|account).{0,30}(?:[!]{3}|[?]{3})',
+     "Garbled symbols mixed with urgency/account language — obfuscation tactic", 35, "phishing"),
+
+    ("obfuscated_account_ref",
+     r'(?:your\s+acct|ur\s+acct|y(?:ou)?r\s+ac(?:c)?t).{0,30}(?:maybe|may\s+be|might\s+be).{0,20}(?:ok|fine|clear|safe)',
+     "Vague 'your account maybe ok' phrasing — classic obfuscated account phishing", 30, "phishing"),
 
 ]
 
